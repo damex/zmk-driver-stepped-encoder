@@ -1,0 +1,26 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+
+menuconfig SENSOR_STEPPED_ENCODER
+    bool "Stepped quadrature rotary encoder"
+    default y
+    depends on DT_HAS_ZMK_STEPPED_ENCODER_ENABLED
+    depends on GPIO
+    depends on SENSOR
+    help
+      Detented quadrature encoder driver. Edge interrupt wakes fixed-rate
+      polling, so contact chatter cannot storm the ISR or flood a split link.
+
+if SENSOR_STEPPED_ENCODER
+
+config SENSOR_STEPPED_ENCODER_STATS
+    bool "Decode counters and periodic log"
+    help
+      Per-instance edges_seen, steps_cw, steps_ccw counters, readable via
+      stepped_encoder_stats_get, plus a periodic INFO log line.
+
+module = SENSOR_STEPPED_ENCODER
+module-str = stepped encoder
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # SENSOR_STEPPED_ENCODER
