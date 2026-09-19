@@ -1,0 +1,20 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+
+description: Detented quadrature rotary encoder
+
+compatible: "zmk,stepped-encoder"
+
+properties:
+  a-gpios:
+    type: phandle-array
+    required: true
+    description: Channel A pin.
+  b-gpios:
+    type: phandle-array
+    required: true
+    description: Channel B pin.
+  steps:
+    type: int
+    required: true
+    description: Quadrature pulses per full rotation.
