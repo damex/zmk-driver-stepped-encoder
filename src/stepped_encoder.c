@@ -90,9 +90,10 @@ static void stepped_encoder_poll(struct k_timer *timer) {
         data->poll_stable++;
         if (data->poll_stable >= IDLE_STABLE_POLLS) {
             k_timer_stop(&data->poll_timer);
-            (void)stepped_encoder_arm(config, true);
+            bool arm_failed = stepped_encoder_arm(config, true) < 0;
             /* Re-read closes the lost-edge window between timer stop and arm. */
-            if (stepped_encoder_read_state(config) != data->ab_state) {
+            bool edge_missed = stepped_encoder_read_state(config) != data->ab_state;
+            if (arm_failed || edge_missed) {
                 stepped_encoder_wake(data);
             }
         }
