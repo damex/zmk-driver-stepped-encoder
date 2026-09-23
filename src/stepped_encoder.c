@@ -57,8 +57,16 @@ struct stepped_encoder_data {
 #endif
 };
 
-static uint8_t stepped_encoder_read_state(const struct stepped_encoder_config *config) {
-    return (uint8_t)(((gpio_pin_get_dt(&config->a) & 1) << 1) | (gpio_pin_get_dt(&config->b) & 1));
+static int stepped_encoder_read_state(const struct stepped_encoder_config *config) {
+    int a_level = gpio_pin_get_dt(&config->a);
+    if (a_level < 0) {
+        return a_level;
+    }
+    int b_level = gpio_pin_get_dt(&config->b);
+    if (b_level < 0) {
+        return b_level;
+    }
+    return (a_level << 1) | b_level;
 }
 
 static int stepped_encoder_arm(const struct stepped_encoder_config *config, bool enable) {
@@ -84,7 +92,11 @@ static void stepped_encoder_poll(struct k_timer *timer) {
         CONTAINER_OF(timer, struct stepped_encoder_data, poll_timer);
     const struct stepped_encoder_config *config = data->dev->config;
 
-    uint8_t new_state = stepped_encoder_read_state(config);
+    int sample = stepped_encoder_read_state(config);
+    if (sample < 0) {
+        return;
+    }
+    uint8_t new_state = (uint8_t)sample;
 
     if (new_state == data->ab_state) {
         data->poll_stable++;
@@ -92,8 +104,10 @@ static void stepped_encoder_poll(struct k_timer *timer) {
             k_timer_stop(&data->poll_timer);
             bool arm_failed = stepped_encoder_arm(config, true) < 0;
             /* Re-read closes the lost-edge window between timer stop and arm. */
-            bool edge_missed = stepped_encoder_read_state(config) != data->ab_state;
-            if (arm_failed || edge_missed) {
+            int current_state = stepped_encoder_read_state(config);
+            bool read_failed = current_state < 0;
+            bool edge_missed = current_state != data->ab_state;
+            if (arm_failed || read_failed || edge_missed) {
                 stepped_encoder_wake(data);
             }
         }
@@ -276,7 +290,12 @@ static int stepped_encoder_init(const struct device *dev) {
         return -EIO;
     }
 
-    data->ab_state = stepped_encoder_read_state(config);
+    int initial_state = stepped_encoder_read_state(config);
+    if (initial_state < 0) {
+        LOG_ERR("initial state read failed");
+        return -EIO;
+    }
+    data->ab_state = (uint8_t)initial_state;
 
     int error = stepped_encoder_arm(config, true);
     if (error < 0) {
