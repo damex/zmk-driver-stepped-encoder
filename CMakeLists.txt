@@ -11,7 +11,6 @@ if(CONFIG_SENSOR_STEPPED_ENCODER)
       -Wformat=2
       -Wlogical-op
       -Wduplicated-cond
-      -Wduplicated-branches
       -Wmissing-prototypes
       -Wjump-misses-init
       -Wwrite-strings
