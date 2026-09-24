@@ -8,7 +8,6 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
-#include <zephyr/irq.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
@@ -39,7 +38,7 @@ struct stepped_encoder_data {
 
     uint8_t ab_state;
     uint16_t poll_stable;
-    int16_t pulses;
+    atomic_t pulses;
 
     struct gpio_callback a_gpio_cb;
     struct gpio_callback b_gpio_cb;
@@ -47,7 +46,7 @@ struct stepped_encoder_data {
     struct k_work_delayable report_work;
 
     sensor_trigger_handler_t handler;
-    const struct sensor_trigger *trigger;
+    atomic_ptr_t trigger;
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
     /* Written from poll timer, read lock-free by stats. */
@@ -134,7 +133,7 @@ static void stepped_encoder_poll(struct k_timer *timer) {
         return;
     }
 
-    data->pulses += step;
+    atomic_add(&data->pulses, step);
     k_work_schedule(&data->report_work, K_MSEC(REPORT_COALESCE_MS));
 }
 
@@ -163,13 +162,10 @@ static void stepped_encoder_report_work_cb(struct k_work *work) {
     struct stepped_encoder_data *data =
         CONTAINER_OF(dwork, struct stepped_encoder_data, report_work);
 
-    /* trigger_set swaps handler and trigger as a pair. */
-    unsigned int key = irq_lock();
+    const struct sensor_trigger *trigger = atomic_ptr_get(&data->trigger);
     sensor_trigger_handler_t handler = data->handler;
-    const struct sensor_trigger *trigger = data->trigger;
-    irq_unlock(key);
 
-    if (handler != NULL) {
+    if (trigger != NULL && handler != NULL) {
         handler(data->dev, trigger);
     }
 }
@@ -217,11 +213,8 @@ static int stepped_encoder_channel_get(const struct device *dev, enum sensor_cha
         return -ENOTSUP;
     }
 
-    /* Exclude the poll writer across this read-reset. */
-    unsigned int key = irq_lock();
-    int16_t pulses = data->pulses;
-    data->pulses = 0;
-    irq_unlock(key);
+    atomic_val_t raw_pulses = atomic_set(&data->pulses, 0);
+    int16_t pulses = (int16_t)CLAMP(raw_pulses, INT16_MIN, INT16_MAX);
 
     struct stepped_encoder_rotation rotation;
     stepped_encoder_decode_rotation(pulses, config->steps, &rotation);
@@ -235,12 +228,11 @@ static int stepped_encoder_trigger_set(const struct device *dev, const struct se
                                        sensor_trigger_handler_t handler) {
     struct stepped_encoder_data *data = dev->data;
 
-    unsigned int key = irq_lock();
-    data->trigger = trig;
+    /* Set-once: ZMK binds at init only, a re-bind can pair new handler with old trigger. */
     data->handler = handler;
+    atomic_ptr_set(&data->trigger, (void *)trig);
     /* Drop motion accumulated before the listener attached. */
-    data->pulses = 0;
-    irq_unlock(key);
+    (void)atomic_set(&data->pulses, 0);
 
     return 0;
 }
