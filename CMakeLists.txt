@@ -3,7 +3,7 @@
 
 if(CONFIG_SENSOR_STEPPED_ENCODER)
   zephyr_include_directories(include)
-  zephyr_library()
+  zephyr_library_named(zmk_driver_stepped_encoder)
   zephyr_library_compile_options(
       -Werror
       -Wextra
