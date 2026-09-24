@@ -22,8 +22,8 @@ LOG_MODULE_REGISTER(stepped_encoder, CONFIG_SENSOR_STEPPED_ENCODER_LOG_LEVEL);
 #define IDLE_STABLE_POLLS 32
 #define STATS_LOG_INTERVAL_SEC 2
 
-/* K_USEC rounds up to one tick, so 150 us silently becomes the tick period on
- * slower kernels. nRF ZMK builds run at 32768 Hz, giving 30.5 us per tick. */
+/* K_USEC rounds up to whole ticks.
+ * Two ticks or more per period keep poll rate near POLL_INTERVAL_US. */
 BUILD_ASSERT(CONFIG_SYS_CLOCK_TICKS_PER_SEC * POLL_INTERVAL_US >= 2 * USEC_PER_SEC,
              "SYS_CLOCK_TICKS_PER_SEC too low for POLL_INTERVAL_US");
 
