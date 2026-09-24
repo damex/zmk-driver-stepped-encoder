@@ -51,9 +51,9 @@ struct stepped_encoder_data {
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
     /* Written from poll timer, read lock-free by stats. */
-    volatile uint32_t edges_seen;
     volatile uint32_t steps_cw;
     volatile uint32_t steps_ccw;
+    volatile uint32_t rejected;
     struct k_work_delayable stats_work;
 #endif
 };
@@ -120,12 +120,14 @@ static void stepped_encoder_poll(struct k_timer *timer) {
     data->poll_stable = 0;
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
-    data->edges_seen++;
     if (step > 0) {
         data->steps_cw++;
     } else if (step < 0) {
         data->steps_ccw++;
+    } else {
+        data->rejected++;
     }
+    k_work_schedule(&data->stats_work, K_SECONDS(STATS_LOG_INTERVAL_SEC));
 #endif
 
     if (step == 0) {
@@ -178,11 +180,11 @@ static void stepped_encoder_stats_log(struct k_work *work) {
     struct stepped_encoder_data *data =
         CONTAINER_OF(dwork, struct stepped_encoder_data, stats_work);
 
-    uint32_t rejected = data->edges_seen - data->steps_cw - data->steps_ccw;
-    LOG_INF("%s edges=%u cw=%u ccw=%u rejected=%u", data->dev->name, data->edges_seen,
-            data->steps_cw, data->steps_ccw, rejected);
-
-    k_work_reschedule(&data->stats_work, K_SECONDS(STATS_LOG_INTERVAL_SEC));
+    struct stepped_encoder_stats stats;
+    stepped_encoder_stats_get(data->dev, &stats);
+    uint32_t rejected = stats.edges_seen - stats.steps_cw - stats.steps_ccw;
+    LOG_INF("%s edges=%u cw=%u ccw=%u rejected=%u", data->dev->name, stats.edges_seen,
+            stats.steps_cw, stats.steps_ccw, rejected);
 }
 
 void stepped_encoder_stats_get(const struct device *dev, struct stepped_encoder_stats *out) {
@@ -191,9 +193,9 @@ void stepped_encoder_stats_get(const struct device *dev, struct stepped_encoder_
 
     struct stepped_encoder_data *data = dev->data;
 
-    out->edges_seen = data->edges_seen;
     out->steps_cw = data->steps_cw;
     out->steps_ccw = data->steps_ccw;
+    out->edges_seen = out->steps_cw + out->steps_ccw + data->rejected;
 }
 #endif
 
@@ -277,7 +279,6 @@ static int stepped_encoder_init(const struct device *dev) {
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
     k_work_init_delayable(&data->stats_work, stepped_encoder_stats_log);
-    k_work_reschedule(&data->stats_work, K_SECONDS(STATS_LOG_INTERVAL_SEC));
 #endif
 
     gpio_init_callback(&data->a_gpio_cb, stepped_encoder_a_gpio_callback, BIT(config->a.pin));
