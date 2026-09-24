@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(stepped_encoder, CONFIG_SENSOR_STEPPED_ENCODER_LOG_LEVEL);
 #define REPORT_COALESCE_MS 8
 #define POLL_INTERVAL_US 150
 #define IDLE_STABLE_POLLS 32
+#define STATS_LOG_INTERVAL_SEC 2
 
 /* K_USEC rounds up to one tick, so 150 us silently becomes the tick period on
  * slower kernels. nRF ZMK builds run at 32768 Hz, giving 30.5 us per tick. */
@@ -181,7 +182,7 @@ static void stepped_encoder_stats_log(struct k_work *work) {
     LOG_INF("%s edges=%u cw=%u ccw=%u rejected=%u", data->dev->name, data->edges_seen,
             data->steps_cw, data->steps_ccw, rejected);
 
-    k_work_reschedule(&data->stats_work, K_SECONDS(2));
+    k_work_reschedule(&data->stats_work, K_SECONDS(STATS_LOG_INTERVAL_SEC));
 }
 
 void stepped_encoder_stats_get(const struct device *dev, struct stepped_encoder_stats *out) {
@@ -276,7 +277,7 @@ static int stepped_encoder_init(const struct device *dev) {
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
     k_work_init_delayable(&data->stats_work, stepped_encoder_stats_log);
-    k_work_reschedule(&data->stats_work, K_SECONDS(2));
+    k_work_reschedule(&data->stats_work, K_SECONDS(STATS_LOG_INTERVAL_SEC));
 #endif
 
     gpio_init_callback(&data->a_gpio_cb, stepped_encoder_a_gpio_callback, BIT(config->a.pin));
