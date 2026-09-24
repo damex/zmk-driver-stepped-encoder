@@ -30,7 +30,13 @@ ZTEST(stepped_encoder_decode, test_two_bit_jump_rejected) {
 
 ZTEST(stepped_encoder_decode, test_no_transition_yields_zero) {
     zassert_equal(stepped_encoder_decode_step(0b00, 0b00), 0, "no change");
+    zassert_equal(stepped_encoder_decode_step(0b01, 0b01), 0, "no change");
+    zassert_equal(stepped_encoder_decode_step(0b10, 0b10), 0, "no change");
     zassert_equal(stepped_encoder_decode_step(0b11, 0b11), 0, "no change");
+}
+
+ZTEST(stepped_encoder_decode, test_high_state_bits_masked) {
+    zassert_equal(stepped_encoder_decode_step(0xFC, 0xFD), 1, "high bits masked, 00->01 cw");
 }
 
 ZTEST(stepped_encoder_decode, test_bounce_pair_cancels) {
@@ -65,6 +71,14 @@ ZTEST(stepped_encoder_decode, test_negative_pulses_split) {
     zassert_equal(rotation.microdegrees, -500000, "sign carries to remainder");
 }
 
+ZTEST(stepped_encoder_decode, test_odd_steps_truncate_remainder) {
+    struct stepped_encoder_rotation rotation;
+
+    stepped_encoder_decode_rotation(1, 7, &rotation);
+    zassert_equal(rotation.degrees, 51, "360/7 is 51 degrees whole");
+    zassert_equal(rotation.microdegrees, 428571, "remainder 3/7 degree truncates toward zero");
+}
+
 ZTEST(stepped_encoder_decode, test_bulk_pulses_do_not_overflow) {
     struct stepped_encoder_rotation rotation;
 
@@ -73,5 +87,24 @@ ZTEST(stepped_encoder_decode, test_bulk_pulses_do_not_overflow) {
                             rotation.microdegrees;
     int64_t expected = (int64_t)INT16_MAX * STEPPED_ENCODER_FULL_ROTATION *
                        STEPPED_ENCODER_MICRODEGREES_PER_DEGREE / 80;
-    zassert_equal(reconstructed, expected, "int64 remainder scaling holds at INT16_MAX pulses");
+    zassert_equal(reconstructed, expected, "scaling holds at INT16_MAX pulses");
+}
+
+ZTEST(stepped_encoder_decode, test_bulk_negative_pulses_do_not_overflow) {
+    struct stepped_encoder_rotation rotation;
+
+    stepped_encoder_decode_rotation(INT16_MIN, 7, &rotation);
+    int64_t reconstructed = (int64_t)rotation.degrees * STEPPED_ENCODER_MICRODEGREES_PER_DEGREE +
+                            rotation.microdegrees;
+    int64_t expected = (int64_t)INT16_MIN * STEPPED_ENCODER_FULL_ROTATION *
+                       STEPPED_ENCODER_MICRODEGREES_PER_DEGREE / 7;
+    zassert_equal(reconstructed, expected, "scaling holds at INT16_MIN pulses");
+}
+
+ZTEST(stepped_encoder_decode, test_large_steps_remainder_needs_int64) {
+    struct stepped_encoder_rotation rotation;
+
+    stepped_encoder_decode_rotation(1000, 65535, &rotation);
+    zassert_equal(rotation.degrees, 5, "360000/65535 is 5 degrees whole");
+    zassert_equal(rotation.microdegrees, 493247, "remainder 32325 scaled past INT32_MAX");
 }
