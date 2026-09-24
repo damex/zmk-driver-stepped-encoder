@@ -14,10 +14,11 @@ menuconfig SENSOR_STEPPED_ENCODER
 if SENSOR_STEPPED_ENCODER
 
 config SENSOR_STEPPED_ENCODER_STATS
-    bool "Decode counters and periodic log"
+    bool "Decode counters, log on rotation"
     help
       Per-instance edges_seen, steps_cw, steps_ccw counters, readable via
-      stepped_encoder_stats_get, plus a periodic INFO log line.
+      stepped_encoder_stats_get.
+      INFO log line on rotation, silent at rest.
 
 module = SENSOR_STEPPED_ENCODER
 module-str = stepped encoder

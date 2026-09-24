@@ -49,8 +49,9 @@ DT example, replacing an existing `alps,ec11` node:
 pulses per detent: `steps = <80>`, `triggers-per-rotation = <20>`.
 
 `CONFIG_SENSOR_STEPPED_ENCODER_STATS=y` exposes per-encoder edge counters via
-`stepped_encoder_stats_get()` from `<zmk/sensor/stepped_encoder.h>`, plus a
-periodic log line. Diagnostic only.
+`stepped_encoder_stats_get()` from `<zmk/sensor/stepped_encoder.h>`.
+Log line on rotation, silent at rest.
+Diagnostic only.
 
 ## Limitations
 
