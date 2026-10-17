@@ -47,6 +47,7 @@ struct stepped_encoder_data {
     uint8_t ab_state;
     uint16_t poll_stable;
     atomic_t pulses;
+    struct stepped_encoder_rotation fetched_rotation;
 
     struct gpio_callback a_gpio_callback;
     struct gpio_callback b_gpio_callback;
@@ -209,30 +210,30 @@ void stepped_encoder_statistics_get(const struct device *dev,
 #endif
 
 static int stepped_encoder_sample_fetch(const struct device *dev, enum sensor_channel chan) {
-    __ASSERT_NO_MSG(chan == SENSOR_CHAN_ALL || chan == SENSOR_CHAN_ROTATION);
+    struct stepped_encoder_data *data = dev->data;
+    const struct stepped_encoder_config *config = dev->config;
 
-    ARG_UNUSED(dev);
-    ARG_UNUSED(chan);
+    if (chan != SENSOR_CHAN_ALL && chan != SENSOR_CHAN_ROTATION) {
+        return -ENOTSUP;
+    }
+
+    atomic_val_t raw_pulses = atomic_set(&data->pulses, 0);
+    int16_t pulses = (int16_t)CLAMP(raw_pulses, INT16_MIN, INT16_MAX);
+    stepped_encoder_decode_rotation(pulses, config->steps, &data->fetched_rotation);
 
     return 0;
 }
 
 static int stepped_encoder_channel_get(const struct device *dev, enum sensor_channel chan,
                                        struct sensor_value *val) {
-    struct stepped_encoder_data *data = dev->data;
-    const struct stepped_encoder_config *config = dev->config;
+    const struct stepped_encoder_data *data = dev->data;
 
     if (chan != SENSOR_CHAN_ROTATION) {
         return -ENOTSUP;
     }
 
-    atomic_val_t raw_pulses = atomic_set(&data->pulses, 0);
-    int16_t pulses = (int16_t)CLAMP(raw_pulses, INT16_MIN, INT16_MAX);
-
-    struct stepped_encoder_rotation rotation;
-    stepped_encoder_decode_rotation(pulses, config->steps, &rotation);
-    val->val1 = rotation.degrees;
-    val->val2 = rotation.microdegrees;
+    val->val1 = data->fetched_rotation.degrees;
+    val->val2 = data->fetched_rotation.microdegrees;
 
     return 0;
 }
