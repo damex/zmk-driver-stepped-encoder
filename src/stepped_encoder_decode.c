@@ -5,8 +5,9 @@
 
 #include "stepped_encoder_decode.h"
 
-#include <assert.h>
 #include <stddef.h>
+
+#include <zephyr/sys/__assert.h>
 
 #define AB_STATE_BITS 2
 #define AB_STATE_MASK 0x03
@@ -27,8 +28,8 @@ int8_t stepped_encoder_decode_step(uint8_t previous_state, uint8_t new_state) {
 
 void stepped_encoder_decode_rotation(int16_t pulses, uint16_t steps,
                                      struct stepped_encoder_rotation *rotation) {
-    assert(rotation != NULL);
-    assert(steps > 0);
+    __ASSERT_NO_MSG(rotation != NULL);
+    __ASSERT_NO_MSG(steps > 0);
 
     int32_t scaled = (int32_t)pulses * STEPPED_ENCODER_FULL_ROTATION;
 
