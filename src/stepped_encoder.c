@@ -250,46 +250,48 @@ static const struct sensor_driver_api stepped_encoder_api = {
     .channel_get = stepped_encoder_channel_get,
 };
 
+static int stepped_encoder_configure_channel(const struct gpio_dt_spec *channel,
+                                             struct gpio_callback *callback,
+                                             gpio_callback_handler_t handler,
+                                             const char *name) {
+    if (!device_is_ready(channel->port)) {
+        LOG_ERR("%s GPIO not ready", name);
+        return -ENODEV;
+    }
+    if (gpio_pin_configure_dt(channel, GPIO_INPUT) < 0) {
+        LOG_ERR("%s pin configure failed", name);
+        return -EIO;
+    }
+    gpio_init_callback(callback, handler, BIT(channel->pin));
+    if (gpio_add_callback(channel->port, callback) < 0) {
+        LOG_ERR("%s callback add failed", name);
+        return -EIO;
+    }
+    return 0;
+}
+
 static int stepped_encoder_initialize(const struct device *dev) {
     struct stepped_encoder_data *data = dev->data;
     const struct stepped_encoder_configuration *configuration = dev->config;
-
-    if (!device_is_ready(configuration->a.port)) {
-        LOG_ERR("A GPIO not ready");
-        return -ENODEV;
-    }
-    if (!device_is_ready(configuration->b.port)) {
-        LOG_ERR("B GPIO not ready");
-        return -ENODEV;
-    }
-
-    if (gpio_pin_configure_dt(&configuration->a, GPIO_INPUT) < 0) {
-        LOG_ERR("A pin configure failed");
-        return -EIO;
-    }
-    if (gpio_pin_configure_dt(&configuration->b, GPIO_INPUT) < 0) {
-        LOG_ERR("B pin configure failed");
-        return -EIO;
-    }
 
     data->device = dev;
     k_timer_init(&data->poll_timer, stepped_encoder_poll, NULL);
     k_work_init_delayable(&data->report_work, stepped_encoder_report_work_handler);
     k_work_init_delayable(&data->statistics_work, stepped_encoder_statistics_log);
 
-    gpio_init_callback(&data->a_gpio_callback,
-                       stepped_encoder_a_gpio_callback,
-                       BIT(configuration->a.pin));
-    if (gpio_add_callback(configuration->a.port, &data->a_gpio_callback) < 0) {
-        LOG_ERR("A callback add failed");
-        return -EIO;
+    int error = stepped_encoder_configure_channel(&configuration->a,
+                                                  &data->a_gpio_callback,
+                                                  stepped_encoder_a_gpio_callback,
+                                                  "A");
+    if (error < 0) {
+        return error;
     }
-    gpio_init_callback(&data->b_gpio_callback,
-                       stepped_encoder_b_gpio_callback,
-                       BIT(configuration->b.pin));
-    if (gpio_add_callback(configuration->b.port, &data->b_gpio_callback) < 0) {
-        LOG_ERR("B callback add failed");
-        return -EIO;
+    error = stepped_encoder_configure_channel(&configuration->b,
+                                              &data->b_gpio_callback,
+                                              stepped_encoder_b_gpio_callback,
+                                              "B");
+    if (error < 0) {
+        return error;
     }
 
     int initial_state = stepped_encoder_read_state(configuration);
@@ -299,7 +301,7 @@ static int stepped_encoder_initialize(const struct device *dev) {
     }
     data->ab_state = (uint8_t)initial_state;
 
-    int error = stepped_encoder_set_interrupts(configuration, GPIO_INT_EDGE_BOTH);
+    error = stepped_encoder_set_interrupts(configuration, GPIO_INT_EDGE_BOTH);
     if (error < 0) {
         LOG_ERR("interrupt configure failed (%d)", error);
         return error;

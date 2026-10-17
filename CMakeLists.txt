@@ -4,6 +4,9 @@
 if(CONFIG_SENSOR_STEPPED_ENCODER)
   zephyr_include_directories(include)
   zephyr_library_named(zmk_driver_stepped_encoder)
+  target_include_directories(${ZEPHYR_CURRENT_LIBRARY} SYSTEM PRIVATE
+      ${ZEPHYR_BASE}/include
+  )
   zephyr_library_compile_options(
       -Werror
       -Wextra
