@@ -1,0 +1,14 @@
+---
+name: unit test
+"on":
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  unit-test:
+    uses: damex/zmk-module-test/.github/workflows/test.yml@main
+    with:
+      target: unit-test

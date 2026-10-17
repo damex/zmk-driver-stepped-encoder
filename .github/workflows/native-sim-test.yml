@@ -1,0 +1,14 @@
+---
+name: native sim test
+"on":
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  native-sim-test:
+    uses: damex/zmk-module-test/.github/workflows/test.yml@main
+    with:
+      target: native-sim-test
