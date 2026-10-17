@@ -78,9 +78,8 @@ static int stepped_encoder_read_state(const struct stepped_encoder_config *confi
     return (a_level << 1) | b_level;
 }
 
-static int stepped_encoder_arm(const struct stepped_encoder_config *config, bool enable) {
-    gpio_flags_t mode = enable ? GPIO_INT_EDGE_BOTH : GPIO_INT_DISABLE;
-
+static int stepped_encoder_set_interrupts(const struct stepped_encoder_config *config,
+                                          gpio_flags_t mode) {
     int error = gpio_pin_interrupt_configure_dt(&config->a, mode);
     if (error < 0) {
         return error;
@@ -91,7 +90,7 @@ static int stepped_encoder_arm(const struct stepped_encoder_config *config, bool
 static void stepped_encoder_wake(struct stepped_encoder_data *data) {
     const struct stepped_encoder_config *config = data->dev->config;
 
-    (void)stepped_encoder_arm(config, false);
+    (void)stepped_encoder_set_interrupts(config, GPIO_INT_DISABLE);
     data->poll_stable = 0;
     k_timer_start(&data->poll_timer, K_USEC(POLL_INTERVAL_US), K_USEC(POLL_INTERVAL_US));
 }
@@ -111,7 +110,7 @@ static void stepped_encoder_poll(struct k_timer *timer) {
         data->poll_stable++;
         if (data->poll_stable >= IDLE_STABLE_POLLS) {
             k_timer_stop(&data->poll_timer);
-            bool arm_failed = stepped_encoder_arm(config, true) < 0;
+            bool arm_failed = stepped_encoder_set_interrupts(config, GPIO_INT_EDGE_BOTH) < 0;
             /* Re-read closes the lost-edge window between timer stop and arm. */
             int current_state = stepped_encoder_read_state(config);
             bool read_failed = current_state < 0;
@@ -305,7 +304,7 @@ static int stepped_encoder_init(const struct device *dev) {
     }
     data->ab_state = (uint8_t)initial_state;
 
-    int error = stepped_encoder_arm(config, true);
+    int error = stepped_encoder_set_interrupts(config, GPIO_INT_EDGE_BOTH);
     if (error < 0) {
         LOG_ERR("interrupt configure failed (%d)", error);
         return error;
