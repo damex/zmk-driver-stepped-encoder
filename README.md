@@ -48,8 +48,8 @@ DT example, replacing an existing `alps,ec11` node:
 `triggers-per-rotation = steps / (pulses per detent)`. A 20-detent EC11 with 4
 pulses per detent: `steps = <80>`, `triggers-per-rotation = <20>`.
 
-`CONFIG_SENSOR_STEPPED_ENCODER_STATS=y` exposes per-encoder edge counters via
-`stepped_encoder_stats_get()` from `<zmk/sensor/stepped_encoder.h>`.
+`CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS=y` exposes per-encoder edge counters
+via `stepped_encoder_statistics_get()` from `<zmk/sensor/stepped_encoder.h>`.
 Log line on rotation, silent at rest.
 Diagnostic only.
 

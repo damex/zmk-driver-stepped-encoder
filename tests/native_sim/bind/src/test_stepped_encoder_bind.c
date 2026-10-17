@@ -21,9 +21,9 @@ static void ignore_report(const struct device *dev, const struct sensor_trigger 
 ZTEST(stepped_encoder_bind, test_motion_before_bind_reads_zero) {
     encoder_rotate_clockwise();
     k_msleep(ENCODER_SETTLE_MS);
-    struct stepped_encoder_stats stats = {0};
-    stepped_encoder_stats_get(encoder_device(), &stats);
-    zassert_equal(stats.steps_cw, ENCODER_PULSES_PER_CYCLE, "cycle seen before bind");
+    struct stepped_encoder_statistics statistics = {0};
+    stepped_encoder_statistics_get(encoder_device(), &statistics);
+    zassert_equal(statistics.steps_clockwise, ENCODER_PULSES_PER_CYCLE, "cycle seen before bind");
     zassert_ok(sensor_trigger_set(encoder_device(), &encoder_rotation_trigger, ignore_report),
                "trigger binds");
     struct sensor_value rotation = encoder_read_rotation();

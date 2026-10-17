@@ -10,17 +10,17 @@
 ZTEST_SUITE(stepped_encoder_decode, NULL, NULL, NULL, NULL, NULL);
 
 ZTEST(stepped_encoder_decode, test_forward_sequence_is_positive) {
-    zassert_equal(stepped_encoder_decode_step(0b00, 0b01), 1, "00->01 cw");
-    zassert_equal(stepped_encoder_decode_step(0b01, 0b11), 1, "01->11 cw");
-    zassert_equal(stepped_encoder_decode_step(0b11, 0b10), 1, "11->10 cw");
-    zassert_equal(stepped_encoder_decode_step(0b10, 0b00), 1, "10->00 cw");
+    zassert_equal(stepped_encoder_decode_step(0b00, 0b01), 1, "00->01 clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b01, 0b11), 1, "01->11 clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b11, 0b10), 1, "11->10 clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b10, 0b00), 1, "10->00 clockwise");
 }
 
 ZTEST(stepped_encoder_decode, test_reverse_sequence_is_negative) {
-    zassert_equal(stepped_encoder_decode_step(0b00, 0b10), -1, "00->10 ccw");
-    zassert_equal(stepped_encoder_decode_step(0b10, 0b11), -1, "10->11 ccw");
-    zassert_equal(stepped_encoder_decode_step(0b11, 0b01), -1, "11->01 ccw");
-    zassert_equal(stepped_encoder_decode_step(0b01, 0b00), -1, "01->00 ccw");
+    zassert_equal(stepped_encoder_decode_step(0b00, 0b10), -1, "00->10 counter-clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b10, 0b11), -1, "10->11 counter-clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b11, 0b01), -1, "11->01 counter-clockwise");
+    zassert_equal(stepped_encoder_decode_step(0b01, 0b00), -1, "01->00 counter-clockwise");
 }
 
 ZTEST(stepped_encoder_decode, test_two_bit_jump_rejected) {
@@ -38,7 +38,7 @@ ZTEST(stepped_encoder_decode, test_no_transition_yields_zero) {
 }
 
 ZTEST(stepped_encoder_decode, test_high_state_bits_masked) {
-    zassert_equal(stepped_encoder_decode_step(0xFC, 0xFD), 1, "high bits masked, 00->01 cw");
+    zassert_equal(stepped_encoder_decode_step(0xFC, 0xFD), 1, "high bits masked, 00->01 clockwise");
 }
 
 ZTEST(stepped_encoder_decode, test_bounce_pair_cancels) {
@@ -46,7 +46,7 @@ ZTEST(stepped_encoder_decode, test_bounce_pair_cancels) {
 
     net += stepped_encoder_decode_step(0b00, 0b01);
     net += stepped_encoder_decode_step(0b01, 0b00);
-    zassert_equal(net, 0, "cw then ccw cancels");
+    zassert_equal(net, 0, "clockwise then counter-clockwise cancels");
 }
 
 ZTEST(stepped_encoder_decode, test_ec11_20_detent_one_pulse) {

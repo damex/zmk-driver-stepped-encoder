@@ -8,14 +8,15 @@
 
 #include <zephyr/device.h>
 
-#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
+#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS)
 
-struct stepped_encoder_stats {
+struct stepped_encoder_statistics {
     uint32_t edges_seen;
-    uint32_t steps_cw;
-    uint32_t steps_ccw;
+    uint32_t steps_clockwise;
+    uint32_t steps_counter_clockwise;
 };
 
-void stepped_encoder_stats_get(const struct device *dev, struct stepped_encoder_stats *out);
+void stepped_encoder_statistics_get(const struct device *dev,
+                                    struct stepped_encoder_statistics *out);
 
 #endif

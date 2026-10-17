@@ -38,15 +38,16 @@ ZTEST(stepped_encoder_rotation, test_counter_clockwise_reads_negative) {
 }
 
 ZTEST(stepped_encoder_rotation, test_two_state_jump_is_rejected) {
-    struct stepped_encoder_stats before = {0};
-    stepped_encoder_stats_get(encoder_device(), &before);
+    struct stepped_encoder_statistics before = {0};
+    stepped_encoder_statistics_get(encoder_device(), &before);
     encoder_set_both_channels(1);
     encoder_set_both_channels(0);
-    struct stepped_encoder_stats after = {0};
-    stepped_encoder_stats_get(encoder_device(), &after);
+    struct stepped_encoder_statistics after = {0};
+    stepped_encoder_statistics_get(encoder_device(), &after);
     zassert_equal(after.edges_seen - before.edges_seen, JUMP_EDGES, "both jumps seen");
-    zassert_equal(after.steps_cw, before.steps_cw, "jump makes no clockwise step");
-    zassert_equal(after.steps_ccw, before.steps_ccw, "jump makes no counter-clockwise step");
+    zassert_equal(after.steps_clockwise, before.steps_clockwise, "jump makes no clockwise step");
+    zassert_equal(after.steps_counter_clockwise, before.steps_counter_clockwise,
+                  "jump makes no counter-clockwise step");
     struct sensor_value rotation = encoder_read_rotation();
     zassert_equal(rotation.val1, 0, "jump reads no rotation");
     zassert_equal(rotation.val2, 0, "jump reads no partial rotation");
