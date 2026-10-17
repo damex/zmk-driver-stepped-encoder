@@ -58,13 +58,9 @@ struct stepped_encoder_data {
     const struct sensor_trigger *trigger;
     atomic_t binding;
 
-#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS)
-    /* Written from poll timer, read lock-free by statistics getter. */
-    volatile uint32_t steps_clockwise;
-    volatile uint32_t steps_counter_clockwise;
-    volatile uint32_t rejected;
+    /* Poll timer ISR writes, threads read without lock. */
+    volatile struct stepped_encoder_statistics statistics;
     struct k_work_delayable statistics_work;
-#endif
 };
 
 static int stepped_encoder_read_state(const struct stepped_encoder_configuration *configuration) {
@@ -127,16 +123,14 @@ static void stepped_encoder_poll(struct k_timer *timer) {
     data->ab_state = new_state;
     data->poll_stable = 0;
 
-#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS)
     if (step > 0) {
-        data->steps_clockwise++;
+        data->statistics.steps_clockwise++;
     } else if (step < 0) {
-        data->steps_counter_clockwise++;
+        data->statistics.steps_counter_clockwise++;
     } else {
-        data->rejected++;
+        data->statistics.rejected++;
     }
     k_work_schedule(&data->statistics_work, K_SECONDS(STATISTICS_LOG_INTERVAL_SEC));
-#endif
 
     if (step == 0) {
         return;
@@ -181,19 +175,14 @@ static void stepped_encoder_report_work_handler(struct k_work *work) {
     }
 }
 
-#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS)
 static void stepped_encoder_statistics_log(struct k_work *work) {
     struct k_work_delayable *delayable = k_work_delayable_from_work(work);
     struct stepped_encoder_data *data =
         CONTAINER_OF(delayable, struct stepped_encoder_data, statistics_work);
 
-    struct stepped_encoder_statistics statistics;
-    stepped_encoder_statistics_get(data->device, &statistics);
-    uint32_t steps = statistics.steps_clockwise + statistics.steps_counter_clockwise;
-    uint32_t rejected = statistics.edges_seen - steps;
-    LOG_INF("%s edges=%u clockwise=%u counter_clockwise=%u rejected=%u", data->device->name,
-            statistics.edges_seen, statistics.steps_clockwise,
-            statistics.steps_counter_clockwise, rejected);
+    LOG_DBG("%s clockwise=%u counter_clockwise=%u rejected=%u", data->device->name,
+            data->statistics.steps_clockwise, data->statistics.steps_counter_clockwise,
+            data->statistics.rejected);
 }
 
 void stepped_encoder_statistics_get(const struct device *device,
@@ -201,13 +190,12 @@ void stepped_encoder_statistics_get(const struct device *device,
     __ASSERT_NO_MSG(device != NULL);
     __ASSERT_NO_MSG(out != NULL);
 
-    struct stepped_encoder_data *data = device->data;
+    const struct stepped_encoder_data *data = device->data;
 
-    out->steps_clockwise = data->steps_clockwise;
-    out->steps_counter_clockwise = data->steps_counter_clockwise;
-    out->edges_seen = out->steps_clockwise + out->steps_counter_clockwise + data->rejected;
+    out->steps_clockwise = data->statistics.steps_clockwise;
+    out->steps_counter_clockwise = data->statistics.steps_counter_clockwise;
+    out->rejected = data->statistics.rejected;
 }
-#endif
 
 static int stepped_encoder_sample_fetch(const struct device *dev, enum sensor_channel chan) {
     struct stepped_encoder_data *data = dev->data;
@@ -287,10 +275,7 @@ static int stepped_encoder_initialize(const struct device *dev) {
     data->device = dev;
     k_timer_init(&data->poll_timer, stepped_encoder_poll, NULL);
     k_work_init_delayable(&data->report_work, stepped_encoder_report_work_handler);
-
-#if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATISTICS)
     k_work_init_delayable(&data->statistics_work, stepped_encoder_statistics_log);
-#endif
 
     gpio_init_callback(&data->a_gpio_callback,
                        stepped_encoder_a_gpio_callback,

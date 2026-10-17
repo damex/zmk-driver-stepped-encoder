@@ -44,7 +44,7 @@ ZTEST(stepped_encoder_rotation, test_two_state_jump_is_rejected) {
     encoder_set_both_channels(0);
     struct stepped_encoder_statistics after = {0};
     stepped_encoder_statistics_get(encoder_device(), &after);
-    zassert_equal(after.edges_seen - before.edges_seen, JUMP_EDGES, "both jumps seen");
+    zassert_equal(after.rejected - before.rejected, JUMP_EDGES, "both jumps rejected");
     zassert_equal(after.steps_clockwise, before.steps_clockwise, "jump makes no clockwise step");
     zassert_equal(after.steps_counter_clockwise, before.steps_counter_clockwise,
                   "jump makes no counter-clockwise step");
