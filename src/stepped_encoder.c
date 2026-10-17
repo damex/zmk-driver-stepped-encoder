@@ -27,6 +27,12 @@ LOG_MODULE_REGISTER(stepped_encoder, CONFIG_SENSOR_STEPPED_ENCODER_LOG_LEVEL);
 BUILD_ASSERT(CONFIG_SYS_CLOCK_TICKS_PER_SEC * POLL_INTERVAL_US >= 2 * USEC_PER_SEC,
              "SYS_CLOCK_TICKS_PER_SEC too low for POLL_INTERVAL_US");
 
+enum stepped_encoder_binding {
+    STEPPED_ENCODER_BINDING_FREE,
+    STEPPED_ENCODER_BINDING_WRITING,
+    STEPPED_ENCODER_BINDING_READY,
+};
+
 struct stepped_encoder_config {
     const struct gpio_dt_spec a;
     const struct gpio_dt_spec b;
@@ -46,7 +52,8 @@ struct stepped_encoder_data {
     struct k_work_delayable report_work;
 
     sensor_trigger_handler_t handler;
-    atomic_ptr_t trigger;
+    const struct sensor_trigger *trigger;
+    atomic_t binding;
 
 #if defined(CONFIG_SENSOR_STEPPED_ENCODER_STATS)
     /* Written from poll timer, read lock-free by stats. */
@@ -162,11 +169,11 @@ static void stepped_encoder_report_work_cb(struct k_work *work) {
     struct stepped_encoder_data *data =
         CONTAINER_OF(dwork, struct stepped_encoder_data, report_work);
 
-    const struct sensor_trigger *trigger = atomic_ptr_get(&data->trigger);
-    sensor_trigger_handler_t handler = data->handler;
-
-    if (trigger != NULL && handler != NULL) {
-        handler(data->dev, trigger);
+    if (atomic_get(&data->binding) != STEPPED_ENCODER_BINDING_READY) {
+        return;
+    }
+    if (data->handler != NULL) {
+        data->handler(data->dev, data->trigger);
     }
 }
 
@@ -228,11 +235,16 @@ static int stepped_encoder_trigger_set(const struct device *dev, const struct se
                                        sensor_trigger_handler_t handler) {
     struct stepped_encoder_data *data = dev->data;
 
-    /* Set-once: ZMK binds at init only, a re-bind can pair new handler with old trigger. */
+    if (!atomic_cas(&data->binding, STEPPED_ENCODER_BINDING_FREE,
+                    STEPPED_ENCODER_BINDING_WRITING)) {
+        return -EALREADY;
+    }
     data->handler = handler;
-    atomic_ptr_set(&data->trigger, (void *)trig);
+    data->trigger = trig;
     /* Drop motion accumulated before the listener attached. */
     (void)atomic_set(&data->pulses, 0);
+    /* Publish after both fields, report work reads them only once READY. */
+    (void)atomic_set(&data->binding, STEPPED_ENCODER_BINDING_READY);
 
     return 0;
 }
