@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Sensor driver for detented rotary encoders. */
+
 #define DT_DRV_COMPAT zmk_stepped_encoder
 
 #include <zmk/sensor/stepped_encoder.h>
@@ -241,9 +243,9 @@ static int stepped_encoder_trigger_set(const struct device *dev, const struct se
     }
     data->handler = handler;
     data->trigger = trig;
-    /* Drop motion accumulated before the listener attached. */
+    /* Motion from before bind never reports. */
     (void)atomic_set(&data->pulses, 0);
-    /* Publish after both fields, report work reads them only once READY. */
+    /* Report work never sees partial binding. */
     (void)atomic_set(&data->binding, STEPPED_ENCODER_BINDING_READY);
 
     return 0;

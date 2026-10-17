@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Stepped encoder public API, decode counters. */
 #pragma once
 
 #include <stdint.h>

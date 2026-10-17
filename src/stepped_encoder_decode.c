@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Quadrature transition decode and pulse to rotation conversion. */
+
 #include "stepped_encoder_decode.h"
 
 #include <assert.h>

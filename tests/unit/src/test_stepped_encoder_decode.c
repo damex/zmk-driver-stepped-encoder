@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Decode tests, real stepped_encoder_decode.c. */
+
 #include <zephyr/ztest.h>
 
 #include "stepped_encoder_decode.h"
