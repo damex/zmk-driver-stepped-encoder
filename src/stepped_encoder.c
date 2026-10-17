@@ -35,14 +35,14 @@ enum stepped_encoder_binding {
     STEPPED_ENCODER_BINDING_READY,
 };
 
-struct stepped_encoder_config {
+struct stepped_encoder_configuration {
     const struct gpio_dt_spec a;
     const struct gpio_dt_spec b;
     const uint16_t steps;
 };
 
 struct stepped_encoder_data {
-    const struct device *dev;
+    const struct device *device;
 
     uint8_t ab_state;
     uint16_t poll_stable;
@@ -67,31 +67,31 @@ struct stepped_encoder_data {
 #endif
 };
 
-static int stepped_encoder_read_state(const struct stepped_encoder_config *config) {
-    int a_level = gpio_pin_get_dt(&config->a);
+static int stepped_encoder_read_state(const struct stepped_encoder_configuration *configuration) {
+    int a_level = gpio_pin_get_dt(&configuration->a);
     if (a_level < 0) {
         return a_level;
     }
-    int b_level = gpio_pin_get_dt(&config->b);
+    int b_level = gpio_pin_get_dt(&configuration->b);
     if (b_level < 0) {
         return b_level;
     }
     return (a_level << 1) | b_level;
 }
 
-static int stepped_encoder_set_interrupts(const struct stepped_encoder_config *config,
+static int stepped_encoder_set_interrupts(const struct stepped_encoder_configuration *configuration,
                                           gpio_flags_t mode) {
-    int error = gpio_pin_interrupt_configure_dt(&config->a, mode);
+    int error = gpio_pin_interrupt_configure_dt(&configuration->a, mode);
     if (error < 0) {
         return error;
     }
-    return gpio_pin_interrupt_configure_dt(&config->b, mode);
+    return gpio_pin_interrupt_configure_dt(&configuration->b, mode);
 }
 
 static void stepped_encoder_wake(struct stepped_encoder_data *data) {
-    const struct stepped_encoder_config *config = data->dev->config;
+    const struct stepped_encoder_configuration *configuration = data->device->config;
 
-    (void)stepped_encoder_set_interrupts(config, GPIO_INT_DISABLE);
+    (void)stepped_encoder_set_interrupts(configuration, GPIO_INT_DISABLE);
     data->poll_stable = 0;
     k_timer_start(&data->poll_timer, K_USEC(POLL_INTERVAL_US), K_USEC(POLL_INTERVAL_US));
 }
@@ -99,9 +99,9 @@ static void stepped_encoder_wake(struct stepped_encoder_data *data) {
 static void stepped_encoder_poll(struct k_timer *timer) {
     struct stepped_encoder_data *data =
         CONTAINER_OF(timer, struct stepped_encoder_data, poll_timer);
-    const struct stepped_encoder_config *config = data->dev->config;
+    const struct stepped_encoder_configuration *configuration = data->device->config;
 
-    int sample = stepped_encoder_read_state(config);
+    int sample = stepped_encoder_read_state(configuration);
     if (sample < 0) {
         return;
     }
@@ -111,9 +111,9 @@ static void stepped_encoder_poll(struct k_timer *timer) {
         data->poll_stable++;
         if (data->poll_stable >= IDLE_STABLE_POLLS) {
             k_timer_stop(&data->poll_timer);
-            bool arm_failed = stepped_encoder_set_interrupts(config, GPIO_INT_EDGE_BOTH) < 0;
+            bool arm_failed = stepped_encoder_set_interrupts(configuration, GPIO_INT_EDGE_BOTH) < 0;
             /* Re-read closes the lost-edge window between timer stop and arm. */
-            int current_state = stepped_encoder_read_state(config);
+            int current_state = stepped_encoder_read_state(configuration);
             bool read_failed = current_state < 0;
             bool edge_missed = current_state != data->ab_state;
             if (arm_failed || read_failed || edge_missed) {
@@ -177,7 +177,7 @@ static void stepped_encoder_report_work_handler(struct k_work *work) {
         return;
     }
     if (data->handler != NULL) {
-        data->handler(data->dev, data->trigger);
+        data->handler(data->device, data->trigger);
     }
 }
 
@@ -188,20 +188,20 @@ static void stepped_encoder_statistics_log(struct k_work *work) {
         CONTAINER_OF(delayable, struct stepped_encoder_data, statistics_work);
 
     struct stepped_encoder_statistics statistics;
-    stepped_encoder_statistics_get(data->dev, &statistics);
+    stepped_encoder_statistics_get(data->device, &statistics);
     uint32_t steps = statistics.steps_clockwise + statistics.steps_counter_clockwise;
     uint32_t rejected = statistics.edges_seen - steps;
-    LOG_INF("%s edges=%u clockwise=%u counter_clockwise=%u rejected=%u", data->dev->name,
+    LOG_INF("%s edges=%u clockwise=%u counter_clockwise=%u rejected=%u", data->device->name,
             statistics.edges_seen, statistics.steps_clockwise,
             statistics.steps_counter_clockwise, rejected);
 }
 
-void stepped_encoder_statistics_get(const struct device *dev,
+void stepped_encoder_statistics_get(const struct device *device,
                                     struct stepped_encoder_statistics *out) {
-    __ASSERT_NO_MSG(dev != NULL);
+    __ASSERT_NO_MSG(device != NULL);
     __ASSERT_NO_MSG(out != NULL);
 
-    struct stepped_encoder_data *data = dev->data;
+    struct stepped_encoder_data *data = device->data;
 
     out->steps_clockwise = data->steps_clockwise;
     out->steps_counter_clockwise = data->steps_counter_clockwise;
@@ -211,7 +211,7 @@ void stepped_encoder_statistics_get(const struct device *dev,
 
 static int stepped_encoder_sample_fetch(const struct device *dev, enum sensor_channel chan) {
     struct stepped_encoder_data *data = dev->data;
-    const struct stepped_encoder_config *config = dev->config;
+    const struct stepped_encoder_configuration *configuration = dev->config;
 
     if (chan != SENSOR_CHAN_ALL && chan != SENSOR_CHAN_ROTATION) {
         return -ENOTSUP;
@@ -219,7 +219,7 @@ static int stepped_encoder_sample_fetch(const struct device *dev, enum sensor_ch
 
     atomic_val_t raw_pulses = atomic_set(&data->pulses, 0);
     int16_t pulses = (int16_t)CLAMP(raw_pulses, INT16_MIN, INT16_MAX);
-    stepped_encoder_decode_rotation(pulses, config->steps, &data->fetched_rotation);
+    stepped_encoder_decode_rotation(pulses, configuration->steps, &data->fetched_rotation);
 
     return 0;
 }
@@ -262,29 +262,29 @@ static const struct sensor_driver_api stepped_encoder_api = {
     .channel_get = stepped_encoder_channel_get,
 };
 
-static int stepped_encoder_init(const struct device *dev) {
+static int stepped_encoder_initialize(const struct device *dev) {
     struct stepped_encoder_data *data = dev->data;
-    const struct stepped_encoder_config *config = dev->config;
+    const struct stepped_encoder_configuration *configuration = dev->config;
 
-    if (!device_is_ready(config->a.port)) {
+    if (!device_is_ready(configuration->a.port)) {
         LOG_ERR("A GPIO not ready");
         return -ENODEV;
     }
-    if (!device_is_ready(config->b.port)) {
+    if (!device_is_ready(configuration->b.port)) {
         LOG_ERR("B GPIO not ready");
         return -ENODEV;
     }
 
-    if (gpio_pin_configure_dt(&config->a, GPIO_INPUT) < 0) {
+    if (gpio_pin_configure_dt(&configuration->a, GPIO_INPUT) < 0) {
         LOG_ERR("A pin configure failed");
         return -EIO;
     }
-    if (gpio_pin_configure_dt(&config->b, GPIO_INPUT) < 0) {
+    if (gpio_pin_configure_dt(&configuration->b, GPIO_INPUT) < 0) {
         LOG_ERR("B pin configure failed");
         return -EIO;
     }
 
-    data->dev = dev;
+    data->device = dev;
     k_timer_init(&data->poll_timer, stepped_encoder_poll, NULL);
     k_work_init_delayable(&data->report_work, stepped_encoder_report_work_handler);
 
@@ -292,25 +292,29 @@ static int stepped_encoder_init(const struct device *dev) {
     k_work_init_delayable(&data->statistics_work, stepped_encoder_statistics_log);
 #endif
 
-    gpio_init_callback(&data->a_gpio_callback, stepped_encoder_a_gpio_callback, BIT(config->a.pin));
-    if (gpio_add_callback(config->a.port, &data->a_gpio_callback) < 0) {
+    gpio_init_callback(&data->a_gpio_callback,
+                       stepped_encoder_a_gpio_callback,
+                       BIT(configuration->a.pin));
+    if (gpio_add_callback(configuration->a.port, &data->a_gpio_callback) < 0) {
         LOG_ERR("A callback add failed");
         return -EIO;
     }
-    gpio_init_callback(&data->b_gpio_callback, stepped_encoder_b_gpio_callback, BIT(config->b.pin));
-    if (gpio_add_callback(config->b.port, &data->b_gpio_callback) < 0) {
+    gpio_init_callback(&data->b_gpio_callback,
+                       stepped_encoder_b_gpio_callback,
+                       BIT(configuration->b.pin));
+    if (gpio_add_callback(configuration->b.port, &data->b_gpio_callback) < 0) {
         LOG_ERR("B callback add failed");
         return -EIO;
     }
 
-    int initial_state = stepped_encoder_read_state(config);
+    int initial_state = stepped_encoder_read_state(configuration);
     if (initial_state < 0) {
         LOG_ERR("initial state read failed");
         return -EIO;
     }
     data->ab_state = (uint8_t)initial_state;
 
-    int error = stepped_encoder_set_interrupts(config, GPIO_INT_EDGE_BOTH);
+    int error = stepped_encoder_set_interrupts(configuration, GPIO_INT_EDGE_BOTH);
     if (error < 0) {
         LOG_ERR("interrupt configure failed (%d)", error);
         return error;
@@ -319,18 +323,23 @@ static int stepped_encoder_init(const struct device *dev) {
     return 0;
 }
 
-#define STEPPED_ENCODER_INST(instance)                                                             \
+#define STEPPED_ENCODER_INSTANCE(instance)                                                         \
     BUILD_ASSERT(DT_INST_PROP(instance, steps) > 0, "zmk,stepped-encoder steps must be > 0");      \
     BUILD_ASSERT(DT_INST_PROP(instance, steps) <= STEPPED_ENCODER_FULL_ROTATION,                   \
                  "zmk,stepped-encoder steps must be <= 360");                                      \
     static struct stepped_encoder_data stepped_encoder_data_##instance;                            \
-    static const struct stepped_encoder_config stepped_encoder_config_##instance = {               \
+    static const struct stepped_encoder_configuration stepped_encoder_configuration_##instance = { \
         .a = GPIO_DT_SPEC_INST_GET(instance, a_gpios),                                             \
         .b = GPIO_DT_SPEC_INST_GET(instance, b_gpios),                                             \
         .steps = DT_INST_PROP(instance, steps),                                                    \
     };                                                                                             \
-    DEVICE_DT_INST_DEFINE(instance, stepped_encoder_init, NULL,                                    \
-                          &stepped_encoder_data_##instance, &stepped_encoder_config_##instance,    \
-                          POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY, &stepped_encoder_api);
+    DEVICE_DT_INST_DEFINE(instance,                                                                \
+                          stepped_encoder_initialize,                                              \
+                          NULL,                                                                    \
+                          &stepped_encoder_data_##instance,                                        \
+                          &stepped_encoder_configuration_##instance,                               \
+                          POST_KERNEL,                                                             \
+                          CONFIG_SENSOR_INIT_PRIORITY,                                             \
+                          &stepped_encoder_api);
 
-DT_INST_FOREACH_STATUS_OKAY(STEPPED_ENCODER_INST)
+DT_INST_FOREACH_STATUS_OKAY(STEPPED_ENCODER_INSTANCE)

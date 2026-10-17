@@ -16,7 +16,7 @@ struct stepped_encoder_statistics {
     uint32_t steps_counter_clockwise;
 };
 
-void stepped_encoder_statistics_get(const struct device *dev,
+void stepped_encoder_statistics_get(const struct device *device,
                                     struct stepped_encoder_statistics *out);
 
 #endif
