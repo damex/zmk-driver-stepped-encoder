@@ -1,6 +1,6 @@
 # Copyright 2026 Roman Kuzmitskii (@damex)
 # SPDX-License-Identifier: MIT
-
+---
 name: zmk-driver-stepped-encoder
 build:
   cmake: .

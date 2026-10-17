@@ -1,9 +1,9 @@
 # Copyright 2026 Roman Kuzmitskii (@damex)
 # SPDX-License-Identifier: MIT
-
+---
 description: Detented quadrature rotary encoder
 
-compatible: "zmk,stepped-encoder"
+compatible: zmk,stepped-encoder
 
 properties:
   a-gpios:
