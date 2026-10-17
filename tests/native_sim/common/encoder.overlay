@@ -1,0 +1,13 @@
+// Copyright 2026 Roman Kuzmitskii (@damex)
+// SPDX-License-Identifier: MIT
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+    encoder: encoder {
+        compatible = "zmk,stepped-encoder";
+        a-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+        b-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+        steps = <80>;
+    };
+};
