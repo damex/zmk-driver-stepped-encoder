@@ -1,0 +1,13 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+---
+common:
+  tags:
+    - stepped_encoder
+
+tests:
+  stepped_encoder.rotation:
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
