@@ -20,3 +20,12 @@ target_sources(testbinary PRIVATE
   src/test_stepped_encoder_decode.c
   ${module_root}/src/stepped_encoder_decode.c
 )
+
+target_compile_options(testbinary PRIVATE
+  -fsanitize=address,undefined
+  -fno-sanitize-recover=all
+)
+
+target_link_options(testbinary PRIVATE
+  -fsanitize=address,undefined
+)
