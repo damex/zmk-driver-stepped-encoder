@@ -4,6 +4,7 @@
 /* Quadrature transition decode and pulse to rotation conversion. */
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define STEPPED_ENCODER_FULL_ROTATION 360
@@ -15,6 +16,8 @@ struct stepped_encoder_rotation {
 };
 
 int8_t stepped_encoder_decode_step(uint8_t previous_state, uint8_t new_state);
+
+bool stepped_encoder_decode_state_changed(int sample, uint8_t previous_state);
 
 void stepped_encoder_decode_rotation(int16_t pulses, uint16_t steps,
                                      struct stepped_encoder_rotation *rotation);

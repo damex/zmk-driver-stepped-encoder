@@ -98,27 +98,22 @@ static void stepped_encoder_poll(struct k_timer *timer) {
     const struct stepped_encoder_configuration *configuration = data->device->config;
 
     int sample = stepped_encoder_read_state(configuration);
-    if (sample < 0) {
-        return;
-    }
-    uint8_t new_state = (uint8_t)sample;
-
-    if (new_state == data->ab_state) {
+    if (!stepped_encoder_decode_state_changed(sample, data->ab_state)) {
         data->poll_stable++;
         if (data->poll_stable >= IDLE_STABLE_POLLS) {
             k_timer_stop(&data->poll_timer);
             bool arm_failed = stepped_encoder_set_interrupts(configuration, GPIO_INT_EDGE_BOTH) < 0;
             /* Re-read closes the lost-edge window between timer stop and arm. */
             int current_state = stepped_encoder_read_state(configuration);
-            bool read_failed = current_state < 0;
-            bool edge_missed = current_state != data->ab_state;
-            if (arm_failed || read_failed || edge_missed) {
+            bool edge_missed = stepped_encoder_decode_state_changed(current_state, data->ab_state);
+            if (arm_failed || edge_missed) {
                 stepped_encoder_wake(data);
             }
         }
         return;
     }
 
+    uint8_t new_state = (uint8_t)sample;
     int8_t step = stepped_encoder_decode_step(data->ab_state, new_state);
     data->ab_state = new_state;
     data->poll_stable = 0;

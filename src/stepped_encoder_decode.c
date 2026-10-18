@@ -26,6 +26,10 @@ int8_t stepped_encoder_decode_step(uint8_t previous_state, uint8_t new_state) {
     return quadrature_step[transition];
 }
 
+bool stepped_encoder_decode_state_changed(int sample, uint8_t previous_state) {
+    return sample >= 0 && sample != previous_state;
+}
+
 void stepped_encoder_decode_rotation(int16_t pulses, uint16_t steps,
                                      struct stepped_encoder_rotation *rotation) {
     __ASSERT_NO_MSG(rotation != NULL);

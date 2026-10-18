@@ -3,6 +3,8 @@
 
 /* Decode tests, real stepped_encoder_decode.c. */
 
+#include <errno.h>
+
 #include <zephyr/ztest.h>
 
 #include "stepped_encoder_decode.h"
@@ -47,6 +49,18 @@ ZTEST(stepped_encoder_decode, test_bounce_pair_cancels) {
     net += stepped_encoder_decode_step(0b00, 0b01);
     net += stepped_encoder_decode_step(0b01, 0b00);
     zassert_equal(net, 0, "clockwise then counter-clockwise cancels");
+}
+
+ZTEST(stepped_encoder_decode, test_read_error_counts_as_unchanged) {
+    zassert_false(stepped_encoder_decode_state_changed(-EIO, 0b00), "read error is no change");
+}
+
+ZTEST(stepped_encoder_decode, test_same_state_is_unchanged) {
+    zassert_false(stepped_encoder_decode_state_changed(0b01, 0b01), "same state is no change");
+}
+
+ZTEST(stepped_encoder_decode, test_new_state_is_changed) {
+    zassert_true(stepped_encoder_decode_state_changed(0b11, 0b01), "new state is change");
 }
 
 ZTEST(stepped_encoder_decode, test_ec11_20_detent_one_pulse) {
