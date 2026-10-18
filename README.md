@@ -21,7 +21,7 @@ unchanged.
   projects:
     - name: zmk-driver-stepped-encoder
       remote: damex
-      revision: v0.2.0
+      revision: v0.2.1
 ```
 
 Then `west update`.
